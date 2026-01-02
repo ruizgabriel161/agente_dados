@@ -8,12 +8,14 @@ class Settings(BaseSettings):
         extra='allow' # permite variáveis desconhecidas
         )
 
-    APP_NAME:str = 'agente_dados'
-    MODEL:str = "llama3.1"   # valores Default
+    APP_NAME:str = 'agente_dados' #Nome do aplicativo
+    MODEL:str = 'llama3.1'   # valores Default
     MODEL_CODE:str = ''
-    LLM_HOST:str = "http://localhost:11434"
+    LLM_HOST:str = 'http://localhost:11434' #localhost da llm
+    DATA_DSN: str = ''
 
-if __name__ == "__main__":
+
+if __name__ == '__main__':
     Settings()
 
 

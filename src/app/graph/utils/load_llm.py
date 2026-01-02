@@ -5,7 +5,7 @@ from langchain.chat_models import init_chat_model, BaseChatModel
 
 class LoadLLM():
     '''Classe responsável por carregar os modelos de LLM'''
-    def __init__(self,  llm: str = Settings().MODEL, base_url:str = Settings().LLM_HOST) -> None:
+    def __init__(self,  llm: str = Settings().MODEL_CODE, base_url:str = Settings().LLM_HOST) -> None:
         '''
         Construtor da classe LoadLLM
 

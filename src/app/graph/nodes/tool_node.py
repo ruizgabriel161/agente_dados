@@ -13,8 +13,13 @@ class ToolsNode(BaseNode):
 
     @override
     def node_process(self, state: State) -> State:
+        result = self._tool_node.invoke(state)
 
-        return self._tool_node.invoke(input=state)
+        # merge explícito para agradar o Pyright
+        return State(
+            messages=result["messages"],
+            sql_executed=True
+        )
 
     @override
     def name(self):

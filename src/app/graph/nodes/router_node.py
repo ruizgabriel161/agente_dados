@@ -4,6 +4,7 @@ from app.graph.prompts.prompt import Supervisor
 from app.graph.states.state import State
 from rich import print
 from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
+from langchain_core.runnables import Runnable
 
 import re
 import unicodedata
@@ -14,8 +15,9 @@ class RouterNode(BaseNode):
     Classe Router para ser uma conditional edge
     """
 
-    def __init__(self, llm=None):
+    def __init__(self, llm: Runnable):
         super().__init__(llm)
+        self.llm: Runnable = llm
 
     def router(self, state: State) -> Literal["gerar_sql_node", "call_node"]:
         """
@@ -55,7 +57,13 @@ class RouterNode(BaseNode):
         if any(w for w in word_list_sql):
             return "gerar_sql_node"
 
-        word_list_chat = ["explique", "o que é", "como funciona", "conceito"]
+        word_list_chat = [
+            "explique",
+            "o que é",
+            "como funciona",
+            "conceito",
+            "meu nome é",
+        ]
 
         if any(c for c in word_list_chat):
             return "call_node"
@@ -67,12 +75,7 @@ class RouterNode(BaseNode):
         content: str = str(decision.content)
         content = content.strip().upper()
 
-        if state.get("sql_executed") or "CHAT" in content:
-            print("call_node")
-        elif "SQL" in content:
-            print("gerar_sql_node")
-        else:
-            print("call_node")
+        print(f"Decisão = {content}")
 
         if state.get("sql_executed") or "CHAT" in content:
             return "call_node"

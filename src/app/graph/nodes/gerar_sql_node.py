@@ -2,7 +2,7 @@ from typing import override
 from app.config.config_env import Settings
 from app.graph.nodes.base_node import BaseNode
 from langchain.messages import HumanMessage, AIMessage, SystemMessage
-
+from langchain_core.runnables import Runnable
 
 from app.graph.prompts.prompt import Supervisor
 from app.graph.states.state import State
@@ -18,8 +18,9 @@ class GerarSQLNode(BaseNode):
     Classe responsável por gerar o sql
     """
 
-    def __init__(self, llm):
+    def __init__(self, llm:Runnable):
         super().__init__(llm)
+        self.llm: Runnable = llm
 
     @override
     def node_process(self, state: State) -> State:
@@ -49,11 +50,6 @@ class GerarSQLNode(BaseNode):
 
         query: str = str(llm_response.content).strip().replace("\n", "")
         query = self.extract_sql(text=query)
-
-        print(f"[blue]Etapa de execução: >GerarSQLNode ({model_name})")
-
-        print(f"Mensagem: {human_message}\nQuery: {query}")
-        print(Markdown("---"))
 
         tool_message = AIMessage(
             content="",

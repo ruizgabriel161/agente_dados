@@ -3,9 +3,9 @@ from app.graph.nodes.base_node import BaseNode
 from app.graph.prompts.prompt import Supervisor
 from app.graph.states.state import State
 from langchain.chat_models import BaseChatModel
-from langchain_core.messages import ToolMessage, HumanMessage, SystemMessage, BaseMessage, AIMessage
-from rich import print
-from rich.markdown import Markdown
+from langchain_core.messages import ToolMessage, HumanMessage, SystemMessage, BaseMessage
+
+
 
 
 class CallNode(BaseNode):
@@ -28,13 +28,7 @@ class CallNode(BaseNode):
         '''
         
         last_message:BaseMessage | ToolMessage | HumanMessage = state['messages'][-1]
-
-        model_name:str = last_message.response_metadata.get('model', '')
-        print(f'[blue]Etapa: >call_node ({model_name})')
         
-        print(Markdown('---'))
-
-
         if isinstance(last_message, ToolMessage):
             prompt = Supervisor('respose_sql').defined_prompt(result=last_message.text)
         else:

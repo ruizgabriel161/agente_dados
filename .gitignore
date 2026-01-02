@@ -12,7 +12,9 @@ wheels/
 #.env
 .env
 
-#Banco de dados
+#Dados do Projeto
 data/
 
+#Configuração Postgress
+_local_data/
 
