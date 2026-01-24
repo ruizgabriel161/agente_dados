@@ -2,7 +2,7 @@ class Supervisor:
     def __init__(self, agent: str):
         self.agent: str = agent
 
-    def defined_prompt(
+    async def defined_prompt(
         self,
         question: str | None = None,
         schema: str | None = None,
@@ -10,114 +10,166 @@ class Supervisor:
     ) -> str:
         match self.agent:
             case "sql":
-                prompt = f"""
-                Você é um GERADOR DE SQL DUCKDB ORIENTADO A SCHEMA.
+               prompt = f"""
+            Você é um GERADOR DE PAYLOAD ESTRUTURADO PARA CONSULTAS SQL.
+            Seu papel é CONVERTER a pergunta do usuário em UM ÚNICO OBJETO JSON
+            que será validado e convertido em SQL por código backend seguro.
 
-                OBJETIVO:
-                Converter a pergunta do usuário em UMA ÚNICA QUERY SQL válida,
-                respeitando ESTRITAMENTE os tipos de dados do schema.
+            ====================================================
+            REGRAS ABSOLUTAS DE SAÍDA (OBRIGATÓRIAS)
+            ====================================================
+            - Responda APENAS com um objeto JSON válido.
+            - NÃO escreva texto, explicações, comentários ou markdown.
+            - NÃO escreva nada antes ou depois do JSON.
+            - O JSON DEVE seguir EXATAMENTE o formato definido abaixo.
+            - NÃO adicione campos extras.
+            - NÃO omita campos obrigatórios.
 
-                ====================================
-                REGRAS ABSOLUTAS DE SAÍDA
-                ====================================
-                - Responda APENAS com SQL puro.
-                - NÃO use ```sql, ``` ou markdown.
-                - NÃO escreva explicações, comentários ou texto.
-                - NÃO escreva nada antes ou depois da query.
-                - A resposta DEVE começar com SELECT.
-                - A resposta DEVE ser executável no DuckDB.
+            ====================================================
+            REGRA CRÍTICA DE LITERALIDADE
+            ====================================================
+            - Valores textuais DEVEM ser copiados EXATAMENTE como aparecem
+            na pergunta do usuário ou no schema.
+            - NÃO normalize, substitua, remova ou altere caracteres especiais.
+            - NÃO substitua "|", "-", "/", ".", "_" ou espaços.
+            - Exemplo: "GC|RPAO" DEVE permanecer exatamente como "GC|RPAO".
 
-                ====================================
-                REGRAS DE SEGURANÇA
-                ====================================
-                - Use APENAS SELECT.
-                - PROIBIDO: INSERT, UPDATE, DELETE, DROP, ALTER.
-                - Use SOMENTE tabelas listadas.
-                - Use SOMENTE colunas existentes no schema.
-                - NÃO invente colunas ou tabelas.
+            ====================================================
+            REGRA CRÍTICA SOBRE VALUE (MUITO IMPORTANTE)
+            ====================================================
+            - O campo "value" DEVE conter um VALOR REAL para comparação.
+            - NUNCA use o TIPO da coluna como valor.
+            - Tipos como "double precision", "varchar", "integer", "text"
+            são APENAS metadados e NUNCA podem aparecer no campo "value".
+            - Se a pergunta NÃO fornecer um valor concreto para uma coluna,
+            NÃO crie filtro para essa coluna.
 
-                ====================================
-                REGRAS DE FORMATAÇÃO (OBRIGATÓRIAS):
-                ====================================
-                - Sempre coloque UM espaço entre palavras-chave SQL, nomes de colunas e nomes de tabelas.
-                - Sempre coloque UM espaço antes e depois de FROM, WHERE, JOIN, ORDER BY.
-                - Nunca junte nome de coluna com palavra-chave SQL.
-                - Nunca junte nome de tabela com palavra-chave SQL.
-                - Use quebra de linha ou espaço, mas nunca concatene tokens.
+            ====================================================
+            FORMATO OBRIGATÓRIO DO PAYLOAD
+            ====================================================
+            {{
+            "schema": "string",
+            "table": "string",
+            "columns": ["string"],
+            "where": [
+                {{
+                "column": "string",
+                "operator": "string",
+                "value": "string | number | boolean",
+                "type": "text | number | boolean | date | timestamp"
+                }}
+            ],
+            "logic": "AND | OR",
+            "order_by": [
+                {{
+                "column": "string",
+                "direction": "ASC | DESC"
+                }}
+            ]
+            }}
 
-                EXEMPLOS:
+            ====================================================
+            REGRAS DE SEGURANÇA (CRÍTICAS)
+            ====================================================
+            - NÃO gere SQL.
+            - NÃO gere funções SQL.
+            - NÃO gere joins, subqueries ou CTEs.
+            - NÃO gere expressões livres.
+            - NÃO gere operadores fora da lista permitida.
+            - NÃO invente colunas, tabelas ou tipos.
+            - Use SOMENTE colunas e tabelas listadas no schema fornecido.
+            - O campo "order_by" é OPCIONAL.
+            - NÃO gere ORDER BY se o usuário não pedir explicitamente.
 
-                ERRADO:
-                SELECT Nome_CompletoFROM GC_RPAOORDER BY Remuneracao
+            ====================================================
+            OPERADORES PERMITIDOS
+            ====================================================
+            - "="
+            - "!="
+            - ">"
+            - ">="
+            - "<"
+            - "<="
+            - "LIKE"
 
-                CORRETO:
-                SELECT Nome_Completo FROM GC_RPAO ORDER BY Remuneracao
+            ====================================================
+            REGRAS DE USO DO OPERADOR LIKE
+            ====================================================
+            - Use LIKE APENAS quando o usuário indicar busca parcial,
+            contenção ou texto aproximado.
+            - Para LIKE, utilize o caractere "%" corretamente.
+            - NÃO use LIKE para valores numéricos.
+            - NÃO altere o texto usado no LIKE.
+
+            ====================================================
+            REGRAS DE TIPAGEM
+            ====================================================
+            TEXT:
+            - O valor DEVE ser uma string.
+            - Preserve exatamente o texto original (incluindo espaços e símbolos).
+
+            NUMBER:
+            - O valor DEVE ser numérico.
+            - NÃO use aspas.
+            - NÃO use nomes de tipos SQL.
+
+            BOOLEAN:
+            - Use true ou false (JSON).
+
+            DATE:
+            - Formato: YYYY-MM-DD
+
+            TIMESTAMP:
+            - Formato: YYYY-MM-DD HH:MM:SS
+
+            ====================================================
+            EXEMPLO CORRETO
+            ====================================================
+            Pergunta:
+            "Colaboradores da área GC|RPAO com remuneração maior que 5000"
+
+            Resposta:
+            {{
+            "schema": "dados",
+            "table": "tb_colaboradores",
+            "columns": ["Nome_Completo", "Remuneracao"],
+            "where": [
+                {{
+                "column": "Nome_Completo",
+                "operator": "LIKE",
+                "value": "%GC|RPAO%",
+                "type": "text"
+                }},
+                {{
+                "column": "Remuneracao",
+                "operator": ">",
+                "value": 5000,
+                "type": "number"
+                }}
+            ],
+            "logic": "AND"
+            }}
+
+            ====================================================
+            SCHEMA DISPONÍVEL
+            ====================================================
+            {schema}
+
+            ====================================================
+            TABELAS DISPONÍVEIS
+            ====================================================
+            - schema: dados
+            - table: tb_colaboradores
+
+            ====================================================
+            PERGUNTA DO USUÁRIO
+            ====================================================
+        {question}
+        """
 
 
-                ====================================
-                REGRAS DE TIPAGEM (CRÍTICAS)
-                ====================================
-                - Respeite EXATAMENTE os tipos do schema.
-
-                - BOOLEAN:
-                - Use TRUE ou FALSE (sem aspas).
-                - NUNCA compare boolean com string.
-                - Exemplo CORRETO: PCD = TRUE
-                - Exemplo PROIBIDO: PCD = 'SIM'
-
-                - NUMÉRICO (INT, BIGINT, DOUBLE, DECIMAL):
-                - Compare SEM aspas.
-                - Exemplo: Salario > 5000
-
-                - TEXTO (VARCHAR, STRING):
-                - Use UPPER(coluna) no WHERE.
-                - Use valores EM MAIÚSCULO entre aspas.
-                - Exemplo: UPPER(Nome) = 'JOÃO'
-
-                - DATA / TIMESTAMP:
-                - Use DATE 'YYYY-MM-DD' quando necessário.
-                - NÃO use texto livre.
-
-                ====================================
-                REGRAS DE FILTRO
-                ====================================
-                - Sempre use UPPER() para colunas de texto no WHERE.
-                - Valores de texto DEVEM estar em MAIÚSCULO.
-                - NÃO aplique UPPER() em colunas que NÃO sejam texto.
-
-                ====================================
-                SCHEMA DISPONÍVEL
-                ====================================
-                {schema}
-
-                ====================================
-                TABELAS DISPONÍVEIS
-                ====================================
-                - GC_RPAO
-
-                ====================================
-                CHECKLIST OBRIGATÓRIO (INTERNO)
-                Antes de responder, verifique:
-                - [ ] Todas as colunas existem no schema
-                - [ ] Todos os filtros respeitam o tipo da coluna
-                - [ ] BOOLEAN não está entre aspas
-                - [ ] TEXTO usa UPPER()
-                - [ ] SQL começa com SELECT
-                - [ ] Não há texto fora do SQL
-
-                ====================================
-                NÃO FAÇA
-                - JOIN - Nenhum tipo de  Join só possuimos a tabela GC_RPAO
-                - UPDATE
-                - DELETE
-
-                ====================================
-                PERGUNTA
-                ====================================
-                {question}
 
 
-                """
             case "decisao":
                 prompt = f"""
                 Você é um classificador de intenções para um agente de dados que usa DuckDB.

@@ -1,7 +1,8 @@
 from abc import ABC, abstractmethod
+from app.graph.context.context import Context
 from app.graph.states.state import State
 from langchain_core.runnables import Runnable
-
+from langgraph.runtime import Runtime
 
 class BaseNode(ABC):
     """
@@ -12,7 +13,7 @@ class BaseNode(ABC):
         self.llm = llm
         
 
-    def run(self, state: State) -> State | str:
+    async def run(self, state: State, *, runtime: Runtime[Context]) -> State | str:
         """
         Método responsável por executar o node e garantir que ele esteja funcionando
 
@@ -27,15 +28,17 @@ class BaseNode(ABC):
         """
         self.__validade_state(state=state)
 
+        context = runtime.context
+
         try:
-            output = self.node_process(state)
+            output = await self.node_process(state, context=context)
         except Exception as e:
             raise e
 
         return output
 
     @abstractmethod
-    def node_process(self, state: State) -> State: ...
+    async def node_process(self, state: State, context: Context) -> State: ...
 
     @abstractmethod
     def name(self) -> str: ...

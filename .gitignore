@@ -18,3 +18,5 @@ data/
 #Configuração Postgress
 _local_data/
 
+#testes
+tests/

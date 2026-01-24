@@ -1,4 +1,5 @@
 from typing import override
+from app.graph.context.context import Context
 from app.graph.nodes.base_node import BaseNode
 from app.graph.prompts.prompt import Supervisor
 from app.graph.states.state import State
@@ -16,7 +17,7 @@ class CallNode(BaseNode):
     llm:BaseChatModel
 
     @override
-    def node_process(self, state: State) -> State:
+    async def node_process(self, state: State, *, context: Context | None) -> State:
         '''
         Método abstraído da BaseNode usado para executar o node
 
@@ -27,16 +28,18 @@ class CallNode(BaseNode):
             State: resultado da llm
         '''
         
+        # print('>Call_Node')
+
         last_message:BaseMessage | ToolMessage | HumanMessage = state['messages'][-1]
         
         if isinstance(last_message, ToolMessage):
-            prompt = Supervisor('respose_sql').defined_prompt(result=last_message.text)
+            prompt = await Supervisor('respose_sql').defined_prompt(result=last_message.text)
         else:
-            prompt = Supervisor('default').defined_prompt()
+            prompt = await Supervisor('default').defined_prompt()
 
-        llm_result = self.llm.invoke([SystemMessage(prompt), *state['messages']])
+        llm_result = await self.llm.ainvoke([SystemMessage(prompt), *state['messages']])
 
-        return {'messages': [llm_result], 'sql_executed': True}
+        return {'messages': [llm_result]}
     
     @override
     def name(self) -> str:

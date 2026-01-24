@@ -1,5 +1,6 @@
 import asyncio
 import sys
+from psycopg_pool import AsyncConnectionPool
 from rich.prompt import Prompt
 from rich import print
 from rich.markdown import Markdown
@@ -14,49 +15,63 @@ from app.graph.context.context import Context
 from app.graph.prompts.prompt import Supervisor
 
 from app.graph.states.state import State
-from app.graph.tools.sql_tool import SQLBot
+from app.graph.utils.verify_system_message import VerifySystemMessage
+from app.model.sql_execute import SQLExecute
 from app.graph.utils.checkpointer import PsqlCheckPointer
 from app.graph.utils.lifespan import async_lifespan
 
+from app.model.schema_inspetor import SchemaInspetor
 
-async def run_project(checkpointer:BaseCheckpointSaver) -> None:
 
+async def run_project(
+    checkpointer: BaseCheckpointSaver, pool: AsyncConnectionPool, thred_id: str
+) -> None:
     graph: CompiledStateGraph[State, Context, State, State] = BuiderGraph().build_graph(
         checkpointer=checkpointer
     )  # grafo
 
-    BuiderGraph().graph_to_png(
-        graph=graph,
-        path=r"K:\Workspace\Python\agente_dados\architecture\graphs\grafo.png",
+    # BuiderGraph().graph_to_png(
+    # graph=graph,
+    # path=r"K:\Workspace\Python\agente_dados\architecture\graphs\grafo.png",
+    # )
+    schema_inspetor = SchemaInspetor(
+        pool=pool
+    )  # objeto da classe para carregar o schema
+
+    sql_execute = SQLExecute(pool=pool)
+    context: Context = Context(
+        user_type="plus", schema_inspetor=schema_inspetor, sql_execute=sql_execute
+    )  # envia o objeto para o contexto
+
+    config = RunnableConfig(
+        configurable={"thread_id": thred_id}
+    )  # configuração de execução
+
+
+    prompt: str = await Supervisor("default").defined_prompt()
+
+    verify_system_message = await VerifySystemMessage().check_system_message(
+            dsn=Settings().DATA_DSN, thread_id=thred_id
     )
-
-    context: Context = Context(user_type="plus")
-    config = RunnableConfig(configurable={"thread_id": 1})  # configuração de execução
-    first_message: bool = True  # booleano de controle do laço
-    prompt: str = Supervisor("default").defined_prompt()
-    sqlbot: SQLBot = SQLBot()  # Objeto do SQLBot
-    schema: str = sqlbot.ensure_table(
-        name="GC_RPAO", path="data/raw/teste.xlsx"
-    )  # Schema dos dados
-
     while True:
         user_input: str = Prompt.ask("[red]User: \n")  # Input do usuário
         human_message: HumanMessage = HumanMessage(user_input)  # Human Message
 
-        if user_input in ["q", "quit", "exit", "bye"]:
+        if user_input.lower() in ["q", "quit", "exit", "bye"]:
             break
-
-        if first_message:
+        
+        if verify_system_message is False:
             current_message: list = [
                 SystemMessage(prompt),
                 human_message,
             ]  # mensagem atual
-            first_message = False
+        else:
+            current_message = []
 
         current_message.append(human_message)
 
         result = await graph.ainvoke(
-            {"messages": current_message, "sql_executed": False, "schema": schema},
+            {"messages": current_message},
             config=config,
             context=context,
         )
@@ -73,14 +88,16 @@ async def run_project(checkpointer:BaseCheckpointSaver) -> None:
     # printa todo o historico do state quando encerrar o programa
     print(await graph.aget_state(config=config))
 
+
 async def main() -> None:
-    async with async_lifespan(), PsqlCheckPointer(Settings().DATA_DSN).create() as checkpointer:
-        await run_project(checkpointer)
+    async with (
+        async_lifespan() as pool,
+        PsqlCheckPointer(Settings().DATA_DSN).create() as checkpointer,
+    ):
+        await run_project(checkpointer, pool, thred_id='2')
 
 
 if __name__ == "__main__":
     if sys.platform == "win32":
-        asyncio.set_event_loop_policy(
-            asyncio.WindowsSelectorEventLoopPolicy()
-        )
+        asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
     asyncio.run(main=main())

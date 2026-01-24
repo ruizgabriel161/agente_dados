@@ -1,4 +1,5 @@
 from typing import Any, override, Literal
+from app.graph.context.context import Context
 from app.graph.nodes.base_node import BaseNode
 from app.graph.prompts.prompt import Supervisor
 from app.graph.states.state import State
@@ -19,7 +20,7 @@ class RouterNode(BaseNode):
         super().__init__(llm)
         self.llm: Runnable = llm
 
-    def router(self, state: State) -> Literal["gerar_sql_node", "call_node"]:
+    async def router(self, state: State, context: Context) -> Literal["gerar_sql_node", "call_node"]:
         """
         router Método para decidir qual caminho a LLM percorrerá. Condicional edge
 
@@ -38,11 +39,31 @@ class RouterNode(BaseNode):
         # padroniza o human_message
         human_message = self.normalize_input(human_message)
 
-        schema = state.get("schema")
+        schema = await context.schema_inspetor.get_schema(
+            schema="dados", table="tb_colaboradores"
+        )
+
+        teste = self.extract_columns(schema=schema)
+
+        print(teste)
+
 
         if schema:
             if any(col for col in self.extract_columns(schema=schema)):
+                print('>teste')
                 return "gerar_sql_node"
+            
+        word_list_chat = [
+            "explique",
+            "o que é",
+            "como funciona",
+            "conceito",
+            "meu nome é",
+        ]
+
+        if any(c in human_message for c in word_list_chat):
+            print('entrou no call_node')
+            return "call_node"
 
         word_list_sql = [
             "listar",
@@ -54,21 +75,11 @@ class RouterNode(BaseNode):
             "fale",
         ]
 
-        if any(w for w in word_list_sql):
+        if any(w in human_message for w in word_list_sql):
             return "gerar_sql_node"
 
-        word_list_chat = [
-            "explique",
-            "o que é",
-            "como funciona",
-            "conceito",
-            "meu nome é",
-        ]
 
-        if any(c for c in word_list_chat):
-            return "call_node"
-
-        prompt: str = Supervisor("decisao").defined_prompt(question=str(human_message))
+        prompt: str = await Supervisor("decisao").defined_prompt(question=str(human_message))
         decision: AIMessage = self.llm.invoke(
             [SystemMessage(prompt), HumanMessage(human_message)]
         )
@@ -95,8 +106,9 @@ class RouterNode(BaseNode):
             set[str]: colunas retornadas
         """
         return {
-            match.group(1).lower()
-            for match in re.finditer(r"-\s*([A-Za-z0-9_%]+)\s*\(", schema)
+            line.split("|")[0].strip().lower()
+            for line in schema.splitlines()
+            if line.strip()  # ignora linhas vazias
         }
 
     def normalize_input(self, input: str) -> str:
@@ -114,8 +126,9 @@ class RouterNode(BaseNode):
         return "".join(c for c in input if not unicodedata.combining(c))
 
     @override
-    def node_process(self, state: State) -> State:
-        return state
+    async def node_process(self, state: State, context: Context) -> State | str:
+        decision = await self.router(state, context=context)
+        return decision 
 
     @override
     def name(
