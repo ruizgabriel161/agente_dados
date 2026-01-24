@@ -10,7 +10,7 @@ from langgraph.graph.state import RunnableConfig, CompiledStateGraph
 from langgraph.checkpoint.base import BaseCheckpointSaver
 
 from app.config.config_env import Settings
-from app.graph.build.buider import BuiderGraph
+from app.graph.builder.builder import BuiderGraph
 from app.graph.context.context import Context
 from app.graph.prompts.prompt import Supervisor
 
